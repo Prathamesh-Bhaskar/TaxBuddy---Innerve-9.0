@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from phi.agent import Agent
 from phi.model.anthropic import Claude
 from phi.model.groq import Groq
+from phi.model.google import Gemini
 from phi.tools.tavily import TavilyTools
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.vectordb.pineconedb import PineconeDB
@@ -14,28 +16,28 @@ load_dotenv()
 
 app = Flask(__name__)
 
+CORS(app)
+
 # Initialize vector database
 vector_db = PineconeDB(
-    name='itr',
+    name="itr",
     dimension=768,
     metric="cosine",
     spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
     use_hybrid_search=True,
     hybrid_alpha=0.5,
-    embedder=GeminiEmbedder()
+    embedder=GeminiEmbedder(),
 )
 
 # Initialize knowledge base
 knowledge_base = PDFKnowledgeBase(
-    path="documents",
-    vector_db=vector_db,
-    reader=PDFReader(chunk=True)
+    path="documents", vector_db=vector_db, reader=PDFReader(chunk=True)
 )
 
 # Initialize agent
 agent = Agent(
     name="Chatbot",
-    model=Claude(id="claude-3-5-sonnet-20240620"),
+    model=Gemini(id="gemini-1.5-flash"),
     instructions=[
         "You are a Smart ITR Filing Assistant specialized in Indian Income Tax Returns. Follow these guidelines:",
         "",
@@ -124,29 +126,32 @@ agent = Agent(
         "14. **Quality Checks:**",
         "    - Verify all citations against the latest amendments.",
         "    - Cross-check calculations and threshold limits.",
-        "    - Ensure consistency in your recommendations."
+        "    - Ensure consistency in your recommendations.",
     ],
     tools=[TavilyTools()],
     knowledge=knowledge_base,
-    search_knowledge=True
+    search_knowledge=True,
 )
 
-@app.route('/')
-def home():
-    return render_template('index.html')
 
-@app.route('/chat', methods=['POST'])
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@app.route("/chat", methods=["POST"])
 def chat():
-    user_message = request.json.get('message', '')
+    user_message = request.json.get("message", "")
     if not user_message:
-        return jsonify({'error': 'No message provided'}), 400
-    
+        return jsonify({"error": "No message provided"}), 400
+
     try:
         # Get response from agent
         response = agent.run(user_message)
-        return jsonify({'response': response.content})
+        return jsonify({"response": response.content})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run(debug=True)

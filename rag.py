@@ -1,6 +1,7 @@
 from phi.agent import Agent
 from phi.model.anthropic import Claude
 from phi.model.groq import Groq
+from phi.model.google import Gemini
 from phi.tools.tavily import TavilyTools
 from phi.knowledge.pdf import PDFKnowledgeBase, PDFReader
 from phi.vectordb.pineconedb import PineconeDB
@@ -10,26 +11,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 vector_db = PineconeDB(
-    name='itr',
+    name="itr",
     dimension=768,
     metric="cosine",
     spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
     use_hybrid_search=True,
     hybrid_alpha=0.5,
-    embedder=GeminiEmbedder()
+    embedder=GeminiEmbedder(),
 )
 
 knowledge_base = PDFKnowledgeBase(
-    path="documents",
-    vector_db=vector_db,
-    reader=PDFReader(chunk=True)
+    path="documents", vector_db=vector_db, reader=PDFReader(chunk=True)
 )
 
 # knowledge_base.load(recreate=True, upsert=True)
 
 agent = Agent(
     name="Chatbot",
-    model=Claude(id="claude-3-5-sonnet-20240620"),
+    model=Gemini(id="gemini-1.5-flash"),
     instructions=[
         "You are a Smart ITR Filing Assistant specialized in Indian Income Tax Returns. Follow these guidelines:",
         "",
@@ -118,18 +117,18 @@ agent = Agent(
         "14. **Quality Checks:**",
         "    - Verify all citations against the latest amendments.",
         "    - Cross-check calculations and threshold limits.",
-        "    - Ensure consistency in your recommendations."
+        "    - Ensure consistency in your recommendations.",
     ],
     tools=[TavilyTools()],
     knowledge=knowledge_base,
-    search_knowledge=True
+    search_knowledge=True,
 )
 
 while True:
     user_input = input("You: ")
-    if user_input.lower() in ['exit', 'quit']:
+    if user_input.lower() in ["exit", "quit"]:
         break
-    
+
     response_stream = agent.run(user_input, stream=True)
     print("Chatbot: ", end="")
     for response in response_stream:
